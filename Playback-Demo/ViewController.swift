@@ -15,33 +15,49 @@ class ViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        
-        let player = OOOoyalaPlayer(pcode: "ZxNGgyOhy-q1LotjzCC58NUpXlWV", domain: OOPlayerDomain(string: "https://tv-demo.link"))
-        self.ooyalaPlayerViewController = OOOoyalaPlayerViewController(player: player)
-        
-        NotificationCenter.default.addObserver(self, selector: #selector(ViewController.notificationHandler(_:)), name: nil, object: self.ooyalaPlayerViewController.player)
-        
-        self.addChildViewController(self.ooyalaPlayerViewController)
-        self.view.addSubview(self.ooyalaPlayerViewController.view)
-        self.ooyalaPlayerViewController.view.frame = self.view.bounds
-        self.ooyalaPlayerViewController.player.setEmbedCode("ljN2w5ZDE6K2g0QlFEfIJsd-pc0TczyP")
-        self.ooyalaPlayerViewController.player.play()
-            }
+        createPlayer(false)
+    }
 
     override func didReceiveMemoryWarning() {
         super.didReceiveMemoryWarning()
         // Dispose of any resources that can be recreated.
+    }
+    
+    func createPlayer(_ addObserver: Bool) {
+        guard let player = OOOoyalaPlayer(pcode: "ZxNGgyOhy-q1LotjzCC58NUpXlWV", domain: OOPlayerDomain(string: "https://tv-demo.link")) else {
+            return
+        }
+        guard let vc = OOOoyalaPlayerViewController(player: player) else {
+            return
+        }
+        self.ooyalaPlayerViewController = vc
+        if (addObserver) {
+            NotificationCenter.default.addObserver(self, selector: #selector(ViewController.notificationHandler(_:)), name: nil, object: player)
+        }
+        self.addChildViewController(vc)
+        self.view.addSubview(vc.view)
+        vc.view.frame = self.view.bounds
+        player.setEmbedCode("ljN2w5ZDE6K2g0QlFEfIJsd-pc0TczyP")
+        player.play()
+    }
+    
+    func destroyPlayer() {
+        guard let vc = self.ooyalaPlayerViewController else {
+            return
+        }
+        vc.player.pause()
+        vc.removeFromParentViewController()
+        NotificationCenter.default.removeObserver(self, name: nil, object: self.ooyalaPlayerViewController.player)
+        vc.player.destroy()
+        self.ooyalaPlayerViewController = nil
     }
 
     @objc func notificationHandler(_ notification: Notification) {
         if notification.name != NSNotification.Name.OOOoyalaPlayerStateChanged {
             return
         }
-        guard let player = self.ooyalaPlayerViewController.player else {
-            return
-        }
-        // debugPrint("@@@ Notification Received: \(notification.name). state: \(OOOoyalaPlayer.playerState(toString: player.state()))")
-        if (player.state() != OOOoyalaPlayerStatePlaying || !self.shouldRestore) {
+        debugPrint("@@@ Notification Received: \(notification.name). state: \(OOOoyalaPlayer.playerState(toString: self.ooyalaPlayerViewController.player.state()))")
+        if (!self.shouldRestore) {
             return
         }
         self.shouldRestore = false
@@ -50,11 +66,17 @@ class ViewController: UIViewController {
             let newTime = getTimeAtProgress(pos)
             self.ooyalaPlayerViewController.player.seek(Float64(newTime.seconds))
         }
+        NotificationCenter.default.removeObserver(self, name: nil, object: self.ooyalaPlayerViewController.player)
     }
     
     func onEnterBackground() {
         savePlaybackPosition()
+        destroyPlayer()
         self.shouldRestore = true
+    }
+    
+    func onEnterForeground() {
+        createPlayer(true)
     }
     
     func savePlaybackPosition() {
@@ -96,6 +118,9 @@ class ViewController: UIViewController {
                 newTime = CMTime(seconds: (duration * clampedProgress) + start, preferredTimescale: TIMESCALE)
             } else {
                 debugPrint("@@@ CMTIMERANGE_IS_VALID(seekableRange) returns false")
+                let start = CMTimeGetSeconds(seekableRange.start)
+                let duration = CMTimeGetSeconds(seekableRange.duration)
+                debugPrint("@@@ seekableRange: start=\(start), duration=\(duration), curr=\(duration * clampedProgress)")
             }
         }
         
