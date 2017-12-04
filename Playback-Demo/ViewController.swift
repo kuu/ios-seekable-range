@@ -53,7 +53,7 @@ class ViewController: UIViewController {
     }
 
     @objc func notificationHandler(_ notification: Notification) {
-        if notification.name != NSNotification.Name.OOOoyalaPlayerStateChanged {
+        if notification.name != NSNotification.Name.OOOoyalaPlayerTimeChanged {
             return
         }
         debugPrint("@@@ Notification Received: \(notification.name). state: \(OOOoyalaPlayer.playerState(toString: self.ooyalaPlayerViewController.player.state()))")
